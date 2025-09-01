@@ -48,12 +48,23 @@ pub fn assess_patch_safety(
     if is_write_patch_constrained_to_writable_paths(action, sandbox_policy, cwd)
         || policy == AskForApproval::OnFailure
     {
-        // Only auto‑approve when we can actually enforce a sandbox. Otherwise
-        // fall back to asking the user because the patch may touch arbitrary
-        // paths outside the project.
+        // Prefer running with a sandbox when available. On platforms without a
+        // sandbox (e.g., Windows), honor `approval_policy = "never"` by
+        // auto‑approving and proceeding without a sandbox as long as the patch
+        // is constrained to writable roots. Otherwise, fall back to asking.
         match get_platform_sandbox() {
             Some(sandbox_type) => SafetyCheck::AutoApprove { sandbox_type },
-            None => SafetyCheck::AskUser,
+            None => {
+                if policy == AskForApproval::Never
+                    && is_write_patch_constrained_to_writable_paths(action, sandbox_policy, cwd)
+                {
+                    SafetyCheck::AutoApprove {
+                        sandbox_type: crate::exec::SandboxType::None,
+                    }
+                } else {
+                    SafetyCheck::AskUser
+                }
+            }
         }
     } else if policy == AskForApproval::Never {
         SafetyCheck::Reject {

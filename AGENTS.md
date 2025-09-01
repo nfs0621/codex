@@ -1,43 +1,37 @@
-# Rust/codex-rs
+# Repository Guidelines
 
-In the codex-rs folder where the rust code lives:
+## Project Structure & Module Organization
+- Root Rust workspace: `codex-rs/` with crates prefixed `codex-` (e.g., `codex-core`, `codex-tui`, `codex-common`, `codex-protocol`).
+- Source: `codex-rs/<crate>/src` • Integration tests: `codex-rs/<crate>/tests`.
+- Snapshots (insta): under each crate’s `tests/snapshots/` (notably in `codex-rs/tui`).
+- TUI styles: `codex-rs/tui/styles.md` documents conventions used by `ratatui`.
 
-- Crate names are prefixed with `codex-`. For example, the `core` folder's crate is named `codex-core`
-- When using format! and you can inline variables into {}, always do that.
-- Never add or modify any code related to `CODEX_SANDBOX_NETWORK_DISABLED_ENV_VAR` or `CODEX_SANDBOX_ENV_VAR`.
-  - You operate in a sandbox where `CODEX_SANDBOX_NETWORK_DISABLED=1` will be set whenever you use the `shell` tool. Any existing code that uses `CODEX_SANDBOX_NETWORK_DISABLED_ENV_VAR` was authored with this fact in mind. It is often used to early exit out of tests that the author knew you would not be able to run given your sandbox limitations.
-  - Similarly, when you spawn a process using Seatbelt (`/usr/bin/sandbox-exec`), `CODEX_SANDBOX=seatbelt` will be set on the child process. Integration tests that want to run Seatbelt themselves cannot be run under Seatbelt, so checks for `CODEX_SANDBOX=seatbelt` are also often used to early exit out of tests, as appropriate.
+## Build, Test, and Development Commands
+- Setup shell: `cd codex-rs`
+- Format code: `just fmt` — runs rustfmt across the workspace.
+- Lint/fix (scoped): `just fix -p <project>` — runs Clippy for a crate (faster than workspace-wide).
+- Test a crate: `cargo test -p codex-tui` — run only that crate’s tests.
+- Full suite (when core/common/protocol change): `cargo test --all-features`.
+- Snapshots: `cargo insta pending-snapshots -p codex-tui` → review; accept with `cargo insta accept -p codex-tui`.
 
-Before finalizing a change to `codex-rs`, run `just fmt` (in `codex-rs` directory) to format the code and `just fix -p <project>` (in `codex-rs` directory) to fix any linter issues in the code. Prefer scoping with `-p` to avoid slow workspace‑wide Clippy builds; only run `just fix` without `-p` if you changed shared crates. Additionally, run the tests:
-1. Run the test for the specific project that was changed. For example, if changes were made in `codex-rs/tui`, run `cargo test -p codex-tui`.
-2. Once those pass, if any changes were made in common, core, or protocol, run the complete test suite with `cargo test --all-features`.
-When running interactively, ask the user before running these commands to finalize.
+## Coding Style & Naming Conventions
+- Rust style: 4-space indent, no tabs; keep functions small and cohesive.
+- Formatting: always run `just fmt` before pushing.
+- Linting: fix Clippy warnings via `just fix -p <project>`; keep warnings at zero.
+- Crate naming: prefix with `codex-`; modules `snake_case`, types `UpperCamelCase`, functions/vars `snake_case`.
+- Strings/formatting: prefer `format!("Hello {name}")` with inlined variables.
+- TUI: use `ratatui::Stylize` helpers like `"text".red().bold()` over manual `Style`/`Span` construction.
 
-## TUI style conventions
+## Testing Guidelines
+- Frameworks: `cargo test` (unit/integration) and `insta` snapshots (TUI output).
+- Update snapshots only for intentional UI changes; review `*.snap.new` before accept.
+- Some tests skip in sandboxed environments; do not alter logic tied to `CODEX_SANDBOX` or `CODEX_SANDBOX_NETWORK_DISABLED`.
 
-See `codex-rs/tui/styles.md`.
+## Commit & Pull Request Guidelines
+- Commits: imperative mood, concise subject, optional scope. Example: `tui: refine patch summary colors`.
+- Reference issues: `Fixes #123` or `Refs #123` in body.
+- PRs: clear description, rationale, linked issues, validation steps, and screenshots/GIFs for TUI changes. Note if snapshots were updated and why.
 
-## TUI code conventions
-
-- Use concise styling helpers from ratatui’s Stylize trait.
-  - Basic spans: use "text".into()
-  - Styled spans: use "text".red(), "text".green(), "text".magenta(), "text".dim(), etc.
-  - Prefer these over constructing styles with `Span::styled` and `Style` directly.
-  - Example: patch summary file lines
-    - Desired: vec!["  └ ".into(), "M".red(), " ".dim(), "tui/src/app.rs".dim()]
-
-## Snapshot tests
-
-This repo uses snapshot tests (via `insta`), especially in `codex-rs/tui`, to validate rendered output. When UI or text output changes intentionally, update the snapshots as follows:
-
-- Run tests to generate any updated snapshots:
-  - `cargo test -p codex-tui`
-- Check what’s pending:
-  - `cargo insta pending-snapshots -p codex-tui`
-- Review changes by reading the generated `*.snap.new` files directly in the repo, or preview a specific file:
-  - `cargo insta show -p codex-tui path/to/file.snap.new`
-- Only if you intend to accept all new snapshots in this crate, run:
-  - `cargo insta accept -p codex-tui`
-
-If you don’t have the tool:
-- `cargo install cargo-insta`
+## Security & Configuration Tips
+- Do not add or modify code related to `CODEX_SANDBOX` or `CODEX_SANDBOX_NETWORK_DISABLED` handling.
+- Avoid adding network-dependent tests; if unavoidable, gate them behind explicit feature flags or env checks.
